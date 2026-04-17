@@ -1,0 +1,2 @@
+"""COBO Wallet MCP package."""
+
