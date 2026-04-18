@@ -20,14 +20,21 @@
 - 会完整跑通提案和确认流程
 - 但不会真的把交易广播到链上
 - 当前 `.env` 已把本地模拟余额默认设成 `50 ETH`，方便直接测试
+- 模拟余额会统一保存在 [wallet_state.json](/Users/william/cobo/data/wallet_state.json)
+- `.env` 里的 `DEMO_SIMULATED_BALANCE_ETH` 只负责提供初始余额
+- `wallet_get_balance`、`wallet_get_overview`、`wallet_estimate_transfer`、`wallet_prepare_transfer` 现在都会直接返回余额来源说明
 
 ## 当前已实现能力
 
 - `wallet_get_overview`
 - `wallet_list_recipients`
+- `wallet_list_whitelist`
+- `wallet_get_receive_card`
 - `wallet_add_recipient`
 - `wallet_update_recipient`
 - `wallet_delete_recipient`
+- `wallet_allow_recipient`
+- `wallet_revoke_recipient`
 - `wallet_prepare_transfer`
 - `wallet_get_proposal`
 - `wallet_cancel_proposal`
@@ -35,6 +42,7 @@
 - `wallet_execute_transfer`
 - `wallet_get_transaction_status`
 - `wallet_list_transactions`
+- `wallet_list_proposals`
 
 当前 MCP 暴露的是“高层工具”，内部仍然保留了更细的模块，但默认不再直接暴露给 Codex。
 
@@ -58,8 +66,14 @@
 
 - `wallet_list_recipients`
   - 因为联系人列表本身就是独立查询动作
+- `wallet_get_receive_card`
+  - 因为“别人怎么给我转账”也是独立场景
+  - 它只负责展示当前钱包的收款信息，不涉及任何写操作
 - `wallet_add_recipient / wallet_update_recipient / wallet_delete_recipient`
   - 因为地址簿维护不是转账主流程，但又是高频的独立管理动作
+- `wallet_list_whitelist / wallet_allow_recipient / wallet_revoke_recipient`
+  - 因为白名单不是“名字映射”，而是独立的权限边界
+  - 地址簿解决“叫什么”，白名单解决“允不允许转”
 - `wallet_get_proposal / wallet_cancel_proposal`
   - 因为提案经常需要单独回看状态、或在执行前主动取消
 - `wallet_confirm_proposal`
@@ -68,6 +82,9 @@
   - 因为执行后查状态仍然是独立动作
 - `wallet_list_transactions`
   - 因为“最近发过哪些交易/取消过哪些提案”本身就是独立查询动作
+- `wallet_list_proposals`
+  - 因为它解决的是另一件事：查看哪些提案还在处理中、下一步该做什么
+  - 默认会优先展示未完成提案，而不是只看历史结果
 
 ## 地址命名化
 
@@ -115,6 +132,42 @@
 
 如果总成本大于当前余额，提案会直接被拒绝，不会先创建再到后面失败。
 
+## 白名单
+
+当前白名单是一个可选的权限边界，和地址簿不是一回事：
+
+- 地址簿：解决“`burn` / `小红` 这种名字对应哪个地址”
+- 白名单：解决“这个地址是否允许被转账”
+
+当 `DEMO_REQUIRE_WHITELIST=true` 时：
+
+- 只有白名单中的地址，才允许创建提案
+- 已创建但尚未执行的提案，如果目标地址后来被移出白名单，也会被阻止继续确认或执行
+- 这种阻止不会产生新状态，而是让提案显示 `ready_for_execution=false`
+
+当前提供 3 个白名单工具：
+
+- `wallet_list_whitelist`
+- `wallet_allow_recipient`
+- `wallet_revoke_recipient`
+
+其中 `wallet_allow_recipient` 默认只保存地址：
+
+- 如果你只传 `target`，白名单里只会写入地址
+- 只有你显式传 `name` 时，才会额外保存一个展示名
+
+你也可以直接对 Codex 说：
+
+```text
+把 burn 加入白名单
+```
+
+或者：
+
+```text
+把 burn 从白名单移除
+```
+
 ## 默认交互流程
 
 ```text
@@ -142,6 +195,47 @@
 -> Codex 再调用 wallet_execute_transfer
 ```
 
+## 提案状态速览
+
+如果你只想先理解“提案现在走到哪一步了”，记这几个状态就够了：
+
+- `pending`
+  - 提案刚创建出来
+  - 说明金额、地址、手续费已经生成
+  - 但你还没明确回复“确认”或“取消”
+- `confirmed_by_user`
+  - 只会在默认模式常见
+  - 表示你已经确认
+  - 下一步可以直接执行
+- `awaiting_local_authorization`
+  - 只会在严格模式出现
+  - 表示你已经确认，但本地 PIN 还没输入
+  - 这时还不能执行
+- `authorized`
+  - 只会在严格模式出现
+  - 表示本地 PIN 已通过
+  - 下一步才允许执行
+- `executed`
+  - 已执行完成
+- `rejected`
+  - 已取消
+- `expired`
+  - 已过期
+
+默认模式最常见的路径是：
+
+```text
+pending -> confirmed_by_user -> executed
+```
+
+严格模式最常见的路径是：
+
+```text
+pending -> awaiting_local_authorization -> authorized -> executed
+```
+
+如果你想看完整状态流转图和每个状态的触发条件，可以看 [docs/architecture.md](docs/architecture.md)。
+
 ## 安装
 
 ```bash
@@ -163,6 +257,7 @@ DEMO_WRITE_ENABLED=false
 DEMO_EXECUTION_MODE=simulate
 DEMO_SIMULATED_BALANCE_ETH=50
 DEMO_REQUIRE_LOCAL_AUTH=false
+DEMO_REQUIRE_WHITELIST=false
 ```
 
 如果你要测试实际“确认执行”步骤，再临时改成：
@@ -177,6 +272,18 @@ DEMO_EXECUTION_MODE=simulate
 ```env
 DEMO_REQUIRE_LOCAL_AUTH=true
 ```
+
+如果你要测试白名单，再额外改成：
+
+```env
+DEMO_REQUIRE_WHITELIST=true
+```
+
+补充说明：
+
+- `DEMO_SIMULATED_BALANCE_ETH` 不是每次请求都直接读取的实时余额
+- 它只用于初始化本地模拟钱包状态
+- 之后余额会和钱包元信息一起保存在 [wallet_state.json](/Users/william/cobo/data/wallet_state.json)
 
 ## 本地 CLI 演示
 
@@ -202,6 +309,30 @@ uv run cobo-wallet-demo policy
 
 ```bash
 uv run cobo-wallet-demo recipients
+```
+
+查看收款信息：
+
+```bash
+uv run cobo-wallet-demo receive-card
+```
+
+查看白名单：
+
+```bash
+uv run cobo-wallet-demo list-whitelist
+```
+
+把联系人或地址加入白名单：
+
+```bash
+uv run cobo-wallet-demo allow-recipient --target burn
+```
+
+把联系人或地址移出白名单：
+
+```bash
+uv run cobo-wallet-demo revoke-recipient --target burn
 ```
 
 新增联系人：
@@ -284,6 +415,12 @@ uv run cobo-wallet-demo list-transactions --limit 10
 uv run cobo-wallet-demo list-proposals
 ```
 
+只查看待处理提案：
+
+```bash
+uv run cobo-wallet-demo list-proposals --status pending --status confirmed_by_user --status awaiting_local_authorization --status authorized
+```
+
 ## 启动 MCP Server
 
 ```bash
@@ -293,7 +430,7 @@ uv run cobo-wallet-mcp
 ## 在 Codex 里注册
 
 ```bash
-codex mcp add cobo-wallet --env DEMO_WRITE_ENABLED=true --env DEMO_EXECUTION_MODE=simulate --env DEMO_REQUIRE_LOCAL_AUTH=false -- uv run --project /Users/william/cobo cobo-wallet-mcp
+codex mcp add cobo-wallet --env DEMO_WRITE_ENABLED=true --env DEMO_EXECUTION_MODE=simulate --env DEMO_REQUIRE_LOCAL_AUTH=false --env DEMO_REQUIRE_WHITELIST=false -- uv run --project /Users/william/cobo cobo-wallet-mcp
 ```
 
 查看是否注册成功：
@@ -308,6 +445,24 @@ codex mcp get cobo-wallet
 
 ```text
 帮我转 0.05 ETH 到 0x000000000000000000000000000000000000dEaD
+```
+
+如果你想让 Codex 直接展示收款信息，可以说：
+
+```text
+显示我的收款信息
+```
+
+或者：
+
+```text
+把我的收款地址发给我
+```
+
+或者：
+
+```text
+生成一段可以转发给别人的收款文本
 ```
 
 默认模式下，理想交互应该是：
@@ -339,6 +494,18 @@ codex mcp get cobo-wallet
 
 ```text
 把 0x000000000000000000000000000000000000dEaD 保存成联系人 burn2，别名为 dead2
+```
+
+如果你开启了白名单模式，也可以直接对 Codex 说：
+
+```text
+把 burn 加入白名单
+```
+
+或者：
+
+```text
+查看当前白名单
 ```
 
 ## 当前边界

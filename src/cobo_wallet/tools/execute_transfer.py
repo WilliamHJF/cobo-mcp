@@ -22,6 +22,13 @@ def handle(context: ToolContext, proposal_id: str) -> dict:
         context.audit_store.append("wallet_execute_transfer", result)
         return result
 
+    context.policy_engine.validate_recipient_whitelisted(
+        address=proposal.to,
+        whitelist_store=context.whitelist_store,
+        requested_to=proposal.requested_to,
+        recipient_name=proposal.recipient_name,
+    )
+
     if context.settings.demo_require_local_authorization:
         if proposal.status in {"pending", "confirmed_by_user", "awaiting_local_authorization"}:
             result = request_local_authorization.handle(context, proposal_id=proposal_id)

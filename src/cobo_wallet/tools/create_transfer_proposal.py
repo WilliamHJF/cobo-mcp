@@ -13,6 +13,12 @@ def handle(context: ToolContext, to: str, amount: str) -> dict:
     context.policy_engine.validate_chain_id(context.settings.demo_chain_id)
     normalized_amount = context.policy_engine.normalize_amount(amount)
     recipient = context.address_book_store.resolve(to)
+    context.policy_engine.validate_recipient_whitelisted(
+        address=recipient["resolved_to"],
+        whitelist_store=context.whitelist_store,
+        requested_to=recipient["requested_to"],
+        recipient_name=recipient["recipient_name"],
+    )
     quote = context.wallet_service.estimate_transfer(
         to=recipient["resolved_to"],
         amount_eth=normalized_amount,

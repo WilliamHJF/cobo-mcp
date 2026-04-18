@@ -6,7 +6,7 @@ from decimal import Decimal
 from web3 import Web3
 
 from cobo_wallet.config.env import Settings
-from cobo_wallet.store.simulated_balance import SimulatedBalanceStore
+from cobo_wallet.store.wallet_state import WalletStateStore
 from cobo_wallet.wallet.rpc import RpcClient
 from cobo_wallet.wallet.signer import Signer
 
@@ -16,38 +16,64 @@ class WalletService:
         self.settings = settings
         self.rpc = RpcClient(settings)
         self.signer = Signer(settings)
-        self.simulated_balance_store = SimulatedBalanceStore(settings)
+        self.wallet_state_store = WalletStateStore(settings, signer=self.signer)
 
     def get_account_summary(self) -> dict:
+        state = self.wallet_state_store.get_state()
         return {
-            "address": self.signer.address(),
-            "network": "Ethereum Sepolia",
-            "chain_id": self.settings.demo_chain_id,
-            "write_enabled": self.settings.demo_write_enabled,
-            "execution_mode": self.settings.demo_execution_mode,
-            "configured": self.settings.is_wallet_configured,
+            "address": state.address,
+            "network": state.network,
+            "chain_id": state.chain_id,
+            "write_enabled": state.write_enabled,
+            "execution_mode": state.execution_mode,
+            "configured": state.configured,
+        }
+
+    def get_balance_source_info(self) -> dict:
+        if self.settings.demo_execution_mode == "simulate":
+            return {
+                "balance_source": "wallet_state",
+                "state_managed": True,
+                "wallet_state_path": str(self.wallet_state_store.path.resolve()),
+                "initial_balance_env": "DEMO_SIMULATED_BALANCE_ETH",
+            }
+        return {
+            "balance_source": "chain_rpc",
+            "state_managed": False,
+            "wallet_state_path": None,
+            "initial_balance_env": None,
         }
 
     def get_balance(self) -> dict:
         if self.settings.demo_execution_mode == "simulate":
-            balance_eth = self.simulated_balance_store.get_balance_eth()
-            return {
-                "address": self.signer.address(),
-                "balance_eth": str(balance_eth),
-                "configured": self.settings.is_wallet_configured,
+            state = self.wallet_state_store.get_state()
+            result = {
+                "address": state.address,
+                "balance_eth": state.simulated_balance_eth,
+                "configured": state.configured,
                 "execution_mode": "simulate",
                 "simulated": True,
             }
+            result.update(self.get_balance_source_info())
+            return result
         if not self.settings.is_wallet_configured:
-            return {"address": self.signer.address(), "balance_eth": "0", "configured": False}
+            result = {
+                "address": self.signer.address(),
+                "balance_eth": "0",
+                "configured": False,
+            }
+            result.update(self.get_balance_source_info())
+            return result
         address = self.signer.address()
         balance_wei = self.rpc.web3.eth.get_balance(address)
         balance_eth = str(Web3.from_wei(balance_wei, "ether"))
-        return {"address": address, "balance_eth": balance_eth, "configured": True}
+        result = {"address": address, "balance_eth": balance_eth, "configured": True}
+        result.update(self.get_balance_source_info())
+        return result
 
     def get_balance_eth_decimal(self) -> Decimal:
         if self.settings.demo_execution_mode == "simulate":
-            return self.simulated_balance_store.get_balance_eth()
+            return self.wallet_state_store.get_balance_eth()
         if not self.settings.is_wallet_configured:
             return Decimal("0")
         address = self.signer.address()
@@ -58,12 +84,14 @@ class WalletService:
         current_balance = self.get_balance_eth_decimal()
         required_total = Decimal(amount_eth) + Decimal(estimated_fee_eth)
         remaining = current_balance - required_total
-        return {
+        result = {
             "current_balance_eth": str(current_balance),
             "required_total_eth": str(required_total),
             "balance_sufficient": current_balance >= required_total,
             "remaining_balance_after_transfer_eth": str(remaining),
         }
+        result.update(self.get_balance_source_info())
+        return result
 
     def estimate_transfer(self, to: str, amount_eth: str) -> dict:
         if not self.settings.is_wallet_configured:
@@ -106,7 +134,7 @@ class WalletService:
         if self.settings.demo_execution_mode == "simulate":
             quote = self.estimate_transfer(to=proposal.to, amount_eth=proposal.amount_eth)
             total_cost_eth = Decimal(quote["estimated_total_cost_eth"])
-            balance_before, balance_after = self.simulated_balance_store.debit(total_cost_eth)
+            balance_before, balance_after = self.wallet_state_store.debit(total_cost_eth)
             raw = f"{proposal.proposal_id}|{proposal.intent_hash}|simulate"
             simulated_tx_hash = "sim_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
             return {

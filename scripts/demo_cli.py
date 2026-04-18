@@ -6,10 +6,9 @@ import sys
 
 from cobo_wallet.server import build_context
 from cobo_wallet.policy.engine import PolicyError
-from cobo_wallet.store.proposals import ProposalStore
-from cobo_wallet.tools.proposal_derived import dump_proposal
 from cobo_wallet.tools import (
     add_recipient,
+    allow_recipient,
     cancel_proposal,
     confirm_proposal,
     confirm_transfer,
@@ -19,11 +18,15 @@ from cobo_wallet.tools import (
     get_account,
     get_balance,
     get_proposal,
+    get_receive_card,
     get_transaction_status,
+    list_whitelist,
+    list_proposals,
     list_recipients,
     list_policy,
     list_transactions,
     request_local_authorization,
+    revoke_recipient,
     update_recipient,
 )
 
@@ -42,9 +45,29 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("balance", help="查看当前钱包余额")
     subparsers.add_parser("policy", help="查看当前策略配置")
     subparsers.add_parser("recipients", help="查看本地地址簿联系人")
-    subparsers.add_parser("list-proposals", help="查看本地提案列表")
+    subparsers.add_parser("receive-card", help="查看适合展示或转发的收款信息")
+    subparsers.add_parser("list-whitelist", help="查看当前白名单地址")
+    list_proposals_parser = subparsers.add_parser(
+        "list-proposals", help="查看本地提案列表，默认优先显示未完成提案"
+    )
+    list_proposals_parser.add_argument(
+        "--limit",
+        type=int,
+        default=20,
+        help="最多返回多少条提案，默认 20",
+    )
+    list_proposals_parser.add_argument(
+        "--status",
+        action="append",
+        dest="statuses",
+        help=(
+            "按提案状态过滤，可重复传多次。"
+            "例如 pending / confirmed_by_user / awaiting_local_authorization /"
+            " authorized / executed / expired / rejected"
+        ),
+    )
     list_transactions_parser = subparsers.add_parser(
-        "list-transactions", help="查看最近已执行的转账历史"
+        "list-transactions", help="查看最近转账历史，包含已执行和已取消提案"
     )
     list_transactions_parser.add_argument(
         "--limit",
@@ -63,6 +86,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="联系人别名，可重复传多次",
     )
     add_recipient_parser.add_argument("--note", help="联系人备注")
+
+    allow_recipient_parser = subparsers.add_parser(
+        "allow-recipient", help="将联系人或地址加入白名单"
+    )
+    allow_recipient_parser.add_argument(
+        "--target",
+        required=True,
+        help="联系人名称、别名或完整地址",
+    )
+    allow_recipient_parser.add_argument(
+        "--name",
+        help="白名单展示名称，可选；不传时默认只保存地址",
+    )
+    allow_recipient_parser.add_argument("--note", help="白名单备注，可选")
+
+    revoke_recipient_parser = subparsers.add_parser(
+        "revoke-recipient", help="将联系人或地址从白名单中移除"
+    )
+    revoke_recipient_parser.add_argument(
+        "--target",
+        required=True,
+        help="白名单名称或完整地址",
+    )
 
     update_recipient_parser = subparsers.add_parser(
         "update-recipient", help="更新地址簿联系人"
@@ -159,8 +205,34 @@ def main() -> None:
             _print(list_recipients.handle(context))
             return
 
+        if args.command == "receive-card":
+            _print(get_receive_card.handle(context))
+            return
+
+        if args.command == "list-whitelist":
+            _print(list_whitelist.handle(context))
+            return
+
         if args.command == "list-transactions":
             _print(list_transactions.handle(context, limit=args.limit))
+            return
+
+        if args.command == "allow-recipient":
+            result = allow_recipient.handle(
+                context,
+                target=args.target,
+                name=args.name,
+                note=args.note,
+            )
+            _print(result)
+            return
+
+        if args.command == "revoke-recipient":
+            result = revoke_recipient.handle(
+                context,
+                target=args.target,
+            )
+            _print(result)
             return
 
         if args.command == "add-recipient":
@@ -195,8 +267,13 @@ def main() -> None:
             return
 
         if args.command == "list-proposals":
-            proposals = ProposalStore(context.settings).list()
-            _print([dump_proposal(proposal) for proposal in proposals])
+            _print(
+                list_proposals.handle(
+                    context,
+                    limit=args.limit,
+                    statuses=args.statuses,
+                )
+            )
             return
 
         if args.command == "estimate":

@@ -135,6 +135,13 @@ class AddressBookStore:
             f"未找到收款对象: {value}。你可以传完整地址，或使用已配置联系人名称，例如：{suggestion}"
         )
 
+    def get_by_address(self, address: str) -> RecipientEntry | None:
+        checksum_address = self._normalize_address(address)
+        for entry in self.list():
+            if Web3.to_checksum_address(entry.address) == checksum_address:
+                return entry
+        return None
+
     def _find_entry(
         self, entries: list[RecipientEntry], identifier: str
     ) -> tuple[int, RecipientEntry] | None:

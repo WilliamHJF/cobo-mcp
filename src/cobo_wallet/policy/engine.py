@@ -46,6 +46,32 @@ class PolicyEngine:
         if not self.settings.demo_write_enabled:
             raise PolicyError("当前项目处于只读模式，未开启写入权限")
 
+    def is_recipient_whitelisted(self, *, address: str, whitelist_store) -> bool:
+        if not self.settings.demo_require_whitelist:
+            return True
+        return whitelist_store.is_allowed(address)
+
+    def validate_recipient_whitelisted(
+        self,
+        *,
+        address: str,
+        whitelist_store,
+        requested_to: str | None = None,
+        recipient_name: str | None = None,
+    ) -> None:
+        if self.is_recipient_whitelisted(
+            address=address,
+            whitelist_store=whitelist_store,
+        ):
+            return
+
+        target_display = recipient_name or requested_to or address
+        raise PolicyError(
+            "收款地址当前不在白名单中，不能发起或执行这笔转账。"
+            f"目标: {target_display} ({address})。"
+            "请先调用 wallet_allow_recipient 将该地址加入白名单。"
+        )
+
     def validate_proposal_executable(self, proposal: Proposal) -> None:
         self.validate_chain_id(proposal.chain_id)
         if self.settings.demo_require_local_authorization and proposal.status != "authorized":

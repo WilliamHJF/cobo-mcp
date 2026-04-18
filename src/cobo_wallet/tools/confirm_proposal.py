@@ -31,6 +31,13 @@ def handle(context: ToolContext, proposal_id: str) -> dict:
             "message": "这条提案已经执行完成，无需再次确认。",
         }
 
+    context.policy_engine.validate_recipient_whitelisted(
+        address=proposal.to,
+        whitelist_store=context.whitelist_store,
+        requested_to=proposal.requested_to,
+        recipient_name=proposal.recipient_name,
+    )
+
     if context.settings.demo_require_local_authorization:
         if proposal.status == "pending":
             proposal = context.proposal_store.mark_user_confirmed(

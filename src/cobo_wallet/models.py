@@ -53,6 +53,22 @@ class RecipientEntry(BaseModel):
     note: str | None = None
 
 
+class WhitelistEntry(BaseModel):
+    address: str
+    name: str | None = None
+    note: str | None = None
+
+
+class WalletState(BaseModel):
+    address: str
+    network: str = "Ethereum Sepolia"
+    chain_id: int
+    execution_mode: str
+    configured: bool
+    write_enabled: bool
+    simulated_balance_eth: str
+
+
 class PolicySnapshot(BaseModel):
     chain_id: int
     write_enabled: bool
@@ -61,5 +77,6 @@ class PolicySnapshot(BaseModel):
     proposal_ttl_minutes: int
     local_authorization_ttl_minutes: int
     local_authorization_required: bool = True
+    whitelist_required: bool = False
     asset: str = "ETH"
     network: str = "Ethereum Sepolia"

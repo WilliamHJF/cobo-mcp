@@ -52,6 +52,8 @@ def build_proposal_detail(context: ToolContext, proposal) -> dict:
         matched_by=matched_by,
     )
     confirmation_preview = _build_confirmation_preview(context, proposal, recipient_preview)
+    whitelist_allowed = _is_whitelist_allowed(context, proposal)
+    blocked_reason = _whitelist_blocked_reason(context, proposal)
     ready_for_execution = _is_ready_for_execution(context, proposal)
     cancellable = proposal.status in CANCELLABLE_PROPOSAL_STATUSES
     next_allowed_actions = _next_allowed_actions(context, proposal)
@@ -63,6 +65,17 @@ def build_proposal_detail(context: ToolContext, proposal) -> dict:
         "confirmation_preview": confirmation_preview,
         "ready_for_execution": ready_for_execution,
         "cancellable": cancellable,
+        "whitelist_required": (
+            context.settings.demo_require_whitelist
+            if context.settings.demo_require_whitelist
+            else None
+        ),
+        "whitelist_allowed": (
+            whitelist_allowed
+            if context.settings.demo_require_whitelist
+            else None
+        ),
+        "blocked_reason": blocked_reason,
         "next_allowed_actions": next_allowed_actions,
         "user_reply_actions": user_reply_actions,
         "message": _proposal_message(context, proposal),
@@ -136,12 +149,20 @@ def _build_confirmation_preview(context: ToolContext, proposal, recipient_previe
 
 
 def _is_ready_for_execution(context: ToolContext, proposal) -> bool:
+    if not _is_whitelist_allowed(context, proposal):
+        return False
     if context.settings.demo_require_local_authorization:
         return proposal.status == "authorized"
     return proposal.status == "confirmed_by_user"
 
 
 def _next_allowed_actions(context: ToolContext, proposal) -> list[str]:
+    if not _is_whitelist_allowed(context, proposal):
+        if proposal.status in CANCELLABLE_PROPOSAL_STATUSES:
+            return ["wallet_cancel_proposal"]
+        if proposal.status == "executed":
+            return ["wallet_get_transaction_status"]
+        return []
     if proposal.status == "pending":
         return ["wallet_confirm_proposal", "wallet_cancel_proposal"]
     if proposal.status == "confirmed_by_user":
@@ -165,6 +186,9 @@ def _user_reply_actions(proposal) -> dict:
 
 
 def _proposal_message(context: ToolContext, proposal) -> str:
+    blocked_reason = _whitelist_blocked_reason(context, proposal)
+    if blocked_reason is not None:
+        return blocked_reason
     if proposal.status == "pending":
         return "提案已创建，尚未记录用户确认。"
     if proposal.status == "confirmed_by_user":
@@ -184,3 +208,21 @@ def _proposal_message(context: ToolContext, proposal) -> str:
     if proposal.status == "expired":
         return "提案已过期。"
     return f"提案当前状态为 {proposal.status}。"
+
+
+def _is_whitelist_allowed(context: ToolContext, proposal) -> bool:
+    return context.policy_engine.is_recipient_whitelisted(
+        address=proposal.to,
+        whitelist_store=context.whitelist_store,
+    )
+
+
+def _whitelist_blocked_reason(context: ToolContext, proposal) -> str | None:
+    if not context.settings.demo_require_whitelist:
+        return None
+    if _is_whitelist_allowed(context, proposal):
+        return None
+    return (
+        "收款地址当前不在白名单中，除非先恢复白名单允许，"
+        "否则不能继续确认或执行这笔提案。"
+    )

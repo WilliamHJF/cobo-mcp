@@ -26,6 +26,7 @@ class Settings(BaseModel):
     demo_execution_mode: str = Field(default="simulate")
     demo_simulated_balance_eth: str = Field(default="50")
     demo_require_local_authorization: bool = Field(default=False)
+    demo_require_whitelist: bool = Field(default=False)
     demo_approval_pin: str = Field(default="246810")
     demo_chain_id: int = Field(default=11155111)
     demo_max_transfer_eth: str = Field(default="0.05")
@@ -48,6 +49,9 @@ def get_settings() -> Settings:
         demo_simulated_balance_eth=os.getenv("DEMO_SIMULATED_BALANCE_ETH", "50"),
         demo_require_local_authorization=_as_bool(
             os.getenv("DEMO_REQUIRE_LOCAL_AUTH"), default=False
+        ),
+        demo_require_whitelist=_as_bool(
+            os.getenv("DEMO_REQUIRE_WHITELIST"), default=False
         ),
         demo_approval_pin=os.getenv("DEMO_APPROVAL_PIN", "246810"),
         demo_chain_id=int(os.getenv("DEMO_CHAIN_ID", "11155111")),

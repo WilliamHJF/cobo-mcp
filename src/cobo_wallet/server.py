@@ -7,8 +7,10 @@ from cobo_wallet.policy.engine import PolicyEngine
 from cobo_wallet.store.address_book import AddressBookStore
 from cobo_wallet.store.audit import AuditStore
 from cobo_wallet.store.proposals import ProposalStore
+from cobo_wallet.store.whitelist import WhitelistStore
 from cobo_wallet.tools import (
     add_recipient,
+    allow_recipient,
     cancel_proposal,
     confirm_proposal,
     create_transfer_proposal,
@@ -17,8 +19,12 @@ from cobo_wallet.tools import (
     get_proposal,
     get_overview,
     get_transaction_status,
+    get_receive_card,
+    list_whitelist,
+    list_proposals,
     list_transactions,
     list_recipients,
+    revoke_recipient,
     update_recipient,
 )
 from cobo_wallet.tools.context import ToolContext
@@ -31,6 +37,7 @@ def build_context() -> ToolContext:
         settings=settings,
         policy_engine=PolicyEngine(settings),
         address_book_store=AddressBookStore(settings),
+        whitelist_store=WhitelistStore(settings),
         proposal_store=ProposalStore(settings),
         audit_store=AuditStore(settings),
         wallet_service=WalletService(settings),
@@ -56,6 +63,14 @@ def build_server() -> FastMCP:
         return list_transactions.handle(context, limit=limit)
 
     @mcp.tool()
+    def wallet_list_proposals(
+        limit: int = 20,
+        statuses: list[str] | None = None,
+    ) -> dict:
+        """列出提案列表。默认优先展示未完成提案，也可以按 status 过滤。"""
+        return list_proposals.handle(context, limit=limit, statuses=statuses)
+
+    @mcp.tool()
     def wallet_get_proposal(proposal_id: str) -> dict:
         """查看一条提案的当前状态、下一步可执行动作和确认信息。"""
         return get_proposal.handle(context, proposal_id=proposal_id)
@@ -69,6 +84,47 @@ def build_server() -> FastMCP:
     def wallet_list_recipients() -> dict:
         """列出可用联系人名称、别名和实际地址，便于先选收款对象。"""
         return list_recipients.handle(context)
+
+    @mcp.tool()
+    def wallet_list_whitelist() -> dict:
+        """列出当前白名单。开启白名单模式后，只允许向这些地址发起或执行转账。"""
+        return list_whitelist.handle(context)
+
+    @mcp.tool()
+    def wallet_allow_recipient(
+        target: str,
+        name: str | None = None,
+        note: str | None = None,
+    ) -> dict:
+        """将一个联系人或地址加入白名单。
+
+        target 可以是：
+        - 地址簿中的联系人名称
+        - 联系人的别名
+        - 完整 EVM 地址
+
+        默认只把地址写入白名单。
+        只有你显式传入 name 时，才会额外保存白名单展示名称。
+        """
+        return allow_recipient.handle(context, target=target, name=name, note=note)
+
+    @mcp.tool()
+    def wallet_revoke_recipient(target: str) -> dict:
+        """把一个联系人或地址从白名单中移除。target 可以是白名单名称或完整地址。"""
+        return revoke_recipient.handle(context, target=target)
+
+    @mcp.tool()
+    def wallet_get_receive_card() -> dict:
+        """返回当前钱包的收款信息，适合直接展示给用户或转发给他人。
+
+        当用户表达以下意图时，应优先调用这个工具：
+        - 显示我的收款信息
+        - 把我的收款地址发给我
+        - 生成一段可转发的收款文本
+        - 生成收款名片
+        - 别人怎么给我的钱包转账
+        """
+        return get_receive_card.handle(context)
 
     @mcp.tool()
     def wallet_add_recipient(
@@ -111,7 +167,7 @@ def build_server() -> FastMCP:
 
     @mcp.tool()
     def wallet_prepare_transfer(to: str, amount: str) -> dict:
-        """准备一笔转账。会解析联系人、检查余额、创建提案，并返回确认卡片。"""
+        """准备一笔转账。会解析联系人、检查白名单、检查余额、创建提案，并返回确认卡片。"""
         return create_transfer_proposal.handle(context, to=to, amount=amount)
 
     @mcp.tool()

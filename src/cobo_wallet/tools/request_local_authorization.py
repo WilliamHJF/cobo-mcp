@@ -47,6 +47,12 @@ def handle(context: ToolContext, proposal_id: str) -> dict:
         raise PolicyError("提案已经执行过，不能再次请求授权")
     if proposal.status == "rejected":
         raise PolicyError("提案已被拒绝，不能请求授权")
+    context.policy_engine.validate_recipient_whitelisted(
+        address=proposal.to,
+        whitelist_store=context.whitelist_store,
+        requested_to=proposal.requested_to,
+        recipient_name=proposal.recipient_name,
+    )
 
     if (
         proposal.status == "authorized"

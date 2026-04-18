@@ -40,6 +40,12 @@ def handle(context: ToolContext, proposal_id: str) -> dict:
             raise PolicyError("提案还没有记录用户确认，请先调用 wallet_confirm_proposal")
         raise PolicyError(f"当前提案状态不允许执行: {proposal.status}")
 
+    context.policy_engine.validate_recipient_whitelisted(
+        address=proposal.to,
+        whitelist_store=context.whitelist_store,
+        requested_to=proposal.requested_to,
+        recipient_name=proposal.recipient_name,
+    )
     context.policy_engine.validate_proposal_executable(proposal)
     result = context.wallet_service.confirm_and_send(proposal)
     context.proposal_store.mark_executed(

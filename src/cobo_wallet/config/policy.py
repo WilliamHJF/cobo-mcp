@@ -12,5 +12,6 @@ def build_policy_snapshot(settings: Settings) -> PolicySnapshot:
         max_transfer_eth=settings.demo_max_transfer_eth,
         proposal_ttl_minutes=settings.demo_proposal_ttl_minutes,
         local_authorization_required=settings.demo_require_local_authorization,
+        whitelist_required=settings.demo_require_whitelist,
         local_authorization_ttl_minutes=settings.demo_local_authorization_ttl_minutes,
     )
