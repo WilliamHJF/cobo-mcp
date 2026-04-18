@@ -171,7 +171,7 @@ DEMO_DATA_DIR=./data
 uv run cobo-wallet-operator
 ```
 
-启动后你会在终端里看到类似输出：
+启动后你会在终端里看到类似输出（有一定的运行延迟是正常的，请耐心等待）：
 
 ```text
 You can now view your Streamlit app in your browser.
@@ -263,6 +263,12 @@ codex mcp get cobo-wallet
 - 你平时真正需要手动开的，是 `Operator Console`
 
 ## 8. 接入 Codex 后可以怎么用
+
+接入Codex：
+
+```bash
+codex
+```
 
 ### 推荐的测试指令
 
