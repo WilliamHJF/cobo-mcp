@@ -14,6 +14,41 @@ from cobo_wallet.config.env import Settings
 from cobo_wallet.models import Proposal
 from cobo_wallet.store.common import read_json, write_json
 
+INTENT_ASSET = "ETH"
+
+
+def build_intent_hash(*, to: str, amount_wei: str, chain_id: int, asset: str = INTENT_ASSET) -> str:
+    intent_raw = f"{to}|{amount_wei}|{chain_id}|{asset}"
+    return hashlib.sha256(intent_raw.encode("utf-8")).hexdigest()
+
+
+def build_legacy_intent_hash(
+    *,
+    to: str,
+    amount_wei: str,
+    chain_id: int,
+    expires_at_iso: str,
+    asset: str = INTENT_ASSET,
+) -> str:
+    intent_raw = f"{to}|{amount_wei}|{chain_id}|{asset}|{expires_at_iso}"
+    return hashlib.sha256(intent_raw.encode("utf-8")).hexdigest()
+
+
+def normalize_datetime_iso(raw: str | datetime | None) -> str | None:
+    if raw is None:
+        return None
+    if isinstance(raw, datetime):
+        dt = raw
+    else:
+        normalized = raw.replace("Z", "+00:00")
+        try:
+            dt = datetime.fromisoformat(normalized)
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).isoformat()
+
 
 class ProposalStore:
     def __init__(self, settings: Settings) -> None:
@@ -188,6 +223,10 @@ class ProposalStore:
                 )
                 normalized_item["balance_before_eth"] = format_eth_storage(balance_before)
                 changed = True
+            if self._normalize_amount_wei(normalized_item):
+                changed = True
+            if self._normalize_intent_hash(normalized_item):
+                changed = True
             if self._normalize_numeric_fields(normalized_item):
                 changed = True
             for field in removed_fields:
@@ -225,7 +264,6 @@ class ProposalStore:
         expires_at = datetime.now(UTC) + timedelta(
             minutes=self.settings.demo_proposal_ttl_minutes
         )
-        intent_raw = f"{to}|{amount_wei}|{chain_id}|ETH|{expires_at.isoformat()}"
         proposal = Proposal(
             proposal_id=f"proposal_{uuid4().hex[:8]}",
             requested_to=requested_to,
@@ -234,13 +272,24 @@ class ProposalStore:
             amount_eth=normalized_amount_eth,
             amount_wei=amount_wei,
             chain_id=chain_id,
-            intent_hash=hashlib.sha256(intent_raw.encode("utf-8")).hexdigest(),
+            intent_hash=build_intent_hash(
+                to=to,
+                amount_wei=amount_wei,
+                chain_id=chain_id,
+            ),
             expires_at=expires_at,
         )
         proposals = self.list()
         proposals.append(proposal)
         self.save_all(proposals)
         return proposal
+
+    def get_expected_intent_hash(self, proposal: Proposal) -> str:
+        return build_intent_hash(
+            to=proposal.to,
+            amount_wei=proposal.amount_wei,
+            chain_id=proposal.chain_id,
+        )
 
     def get(self, proposal_id: str) -> Proposal | None:
         for proposal in self.list():
@@ -434,3 +483,49 @@ class ProposalStore:
                 item[field] = normalized
                 changed = True
         return changed
+
+    def _normalize_amount_wei(self, item: dict) -> bool:
+        if item.get("amount_wei") is not None or item.get("amount_eth") is None:
+            return False
+        normalized_amount_eth = format_eth_storage(item["amount_eth"])
+        item["amount_wei"] = str(Web3.to_wei(Decimal(normalized_amount_eth), "ether"))
+        return True
+
+    def _normalize_intent_hash(self, item: dict) -> bool:
+        expected_intent_hash = self._build_expected_intent_hash(item)
+        if expected_intent_hash is None:
+            return False
+
+        stored_intent_hash = item.get("intent_hash")
+        legacy_intent_hash = self._build_legacy_intent_hash(item)
+
+        if stored_intent_hash in {None, legacy_intent_hash} and stored_intent_hash != expected_intent_hash:
+            item["intent_hash"] = expected_intent_hash
+            return True
+        return False
+
+    def _build_expected_intent_hash(self, item: dict) -> str | None:
+        to = item.get("to")
+        amount_wei = item.get("amount_wei")
+        chain_id = item.get("chain_id")
+        if to is None or amount_wei is None or chain_id is None:
+            return None
+        return build_intent_hash(
+            to=str(to),
+            amount_wei=str(amount_wei),
+            chain_id=int(chain_id),
+        )
+
+    def _build_legacy_intent_hash(self, item: dict) -> str | None:
+        to = item.get("to")
+        amount_wei = item.get("amount_wei")
+        chain_id = item.get("chain_id")
+        expires_at_iso = normalize_datetime_iso(item.get("expires_at"))
+        if to is None or amount_wei is None or chain_id is None or expires_at_iso is None:
+            return None
+        return build_legacy_intent_hash(
+            to=str(to),
+            amount_wei=str(amount_wei),
+            chain_id=int(chain_id),
+            expires_at_iso=expires_at_iso,
+        )
