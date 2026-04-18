@@ -8,8 +8,68 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
-ENV_PATH = ROOT_DIR / ".env"
+PROJECT_ROOT_ENV_VAR = "COBO_PROJECT_ROOT"
+ENV_FILE_ENV_VAR = "COBO_ENV_FILE"
+PROJECT_ROOT_MARKERS = ("pyproject.toml", ".git")
+
+
+def _resolve_path(value: str | Path, *, base_dir: Path) -> Path:
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute():
+        candidate = base_dir / candidate
+    return candidate.resolve(strict=False)
+
+
+def _find_ancestor_with_markers(start: Path, markers: tuple[str, ...]) -> Path | None:
+    current = start.resolve(strict=False)
+    if current.is_file():
+        current = current.parent
+
+    for candidate in (current, *current.parents):
+        if any((candidate / marker).exists() for marker in markers):
+            return candidate
+    return None
+
+
+def _discover_project_root() -> Path:
+    override = os.getenv(PROJECT_ROOT_ENV_VAR)
+    if override:
+        return _resolve_path(override, base_dir=Path.cwd())
+
+    for start in (Path.cwd(), Path(__file__).resolve(strict=False)):
+        resolved = _find_ancestor_with_markers(start, PROJECT_ROOT_MARKERS)
+        if resolved is not None:
+            return resolved
+
+    return Path.cwd().resolve(strict=False)
+
+
+def _discover_env_path(root_dir: Path) -> Path:
+    override = os.getenv(ENV_FILE_ENV_VAR)
+    if override:
+        return _resolve_path(override, base_dir=Path.cwd())
+
+    for start in (Path.cwd(), Path(__file__).resolve(strict=False)):
+        resolved = _find_ancestor_with_markers(start, (".env",))
+        if resolved is not None:
+            return (resolved / ".env").resolve(strict=False)
+
+    return (root_dir / ".env").resolve(strict=False)
+
+
+def _default_data_dir(*, root_dir: Path, env_path: Path) -> Path:
+    base_dir = env_path.parent if env_path.name == ".env" else root_dir
+    return (base_dir / "data").resolve(strict=False)
+
+
+def _resolve_data_dir(raw_value: str | None, *, root_dir: Path, env_path: Path) -> Path:
+    if raw_value is None or not raw_value.strip():
+        return _default_data_dir(root_dir=root_dir, env_path=env_path)
+    return _resolve_path(raw_value.strip(), base_dir=env_path.parent)
+
+
+ROOT_DIR = _discover_project_root()
+ENV_PATH = _discover_env_path(ROOT_DIR)
 load_dotenv(ENV_PATH)
 
 
@@ -66,7 +126,11 @@ def get_settings() -> Settings:
         demo_local_authorization_ttl_minutes=int(
             os.getenv("DEMO_LOCAL_AUTH_TTL_MINUTES", "5")
         ),
-        demo_data_dir=Path(os.getenv("DEMO_DATA_DIR", str(ROOT_DIR / "data"))),
+        demo_data_dir=_resolve_data_dir(
+            os.getenv("DEMO_DATA_DIR"),
+            root_dir=ROOT_DIR,
+            env_path=ENV_PATH,
+        ),
     )
 
 
