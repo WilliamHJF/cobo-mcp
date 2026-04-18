@@ -423,7 +423,9 @@ def _funding_rows(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _whitelist_rows(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         {
+            "名称": item.get("name") or item.get("recipient_name") or "-",
             "地址": item.get("address"),
+            "备注": item.get("note") or item.get("recipient_note") or "-",
         }
         for item in items
     ]
@@ -710,7 +712,19 @@ def _balance_page(service: OperatorConsoleService) -> None:
 
 def _whitelist_page(service: OperatorConsoleService) -> None:
     entries = service.context.whitelist_store.list()
-    entry_rows = [entry.model_dump(mode="json", exclude_none=True) for entry in entries]
+    entry_rows: list[dict[str, Any]] = []
+    for entry in entries:
+        item = entry.model_dump(mode="json", exclude_none=True)
+        recipient = service.context.address_book_store.get_by_address(entry.address)
+        if recipient is not None:
+            item["recipient_name"] = recipient.name
+            if recipient.note:
+                item["recipient_note"] = recipient.note
+        if "name" not in item and recipient is not None:
+            item["name"] = recipient.name
+        if "note" not in item and recipient is not None and recipient.note:
+            item["note"] = recipient.note
+        entry_rows.append(item)
     policy = service.get_policy_config()
 
     _render_page_header(

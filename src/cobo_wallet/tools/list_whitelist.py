@@ -3,9 +3,23 @@ from __future__ import annotations
 from cobo_wallet.tools.context import ToolContext
 
 
+def _serialize_entry(context: ToolContext, entry) -> dict:
+    item = entry.model_dump(mode="json", exclude_none=True)
+    recipient = context.address_book_store.get_by_address(entry.address)
+    if recipient is not None:
+        item["recipient_name"] = recipient.name
+        if recipient.note:
+            item["recipient_note"] = recipient.note
+    if "name" not in item and recipient is not None:
+        item["name"] = recipient.name
+    if "note" not in item and recipient is not None and recipient.note:
+        item["note"] = recipient.note
+    return item
+
+
 def handle(context: ToolContext) -> dict:
     entries = [
-        entry.model_dump(mode="json", exclude_none=True)
+        _serialize_entry(context, entry)
         for entry in context.whitelist_store.list()
     ]
     result = {
