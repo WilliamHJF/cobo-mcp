@@ -75,14 +75,50 @@ uv run python -m compileall src scripts
 
 ## 4. 最重要的一步：先配置 `.env`
 
-直接编辑项目根目录下现有的 `.env`。
+GitHub 上不会包含 `.env`，因为这个文件不会提交到仓库。
+
+clone 完项目后，请先在项目根目录创建 `.env`：
+
+```bash
+cp .env.example .env
+```
+
+如果你不想先打开 `.env.example`，也可以直接新建 `.env`，然后粘贴下面这份当前示例配置：
+
+```dotenv
+# =========================
+# COBO Wallet MCP 本地配置
+# =========================
+#
+# 当前示例测试钱包地址：
+# 0xC18f9e83970032AEC511123F311A10b0A2c68256
+#
+# 安全提醒：
+# - 只用于 Sepolia 测试链和本地 Demo
+# - 不要复用到主网
+# - 如果你要公开 fork 或分享仓库，请先替换 DEMO_PRIVATE_KEY 和 PIN
+# - 当前没有单独设置 DEMO_OPERATOR_PIN，Operator Console 会回退使用 DEMO_APPROVAL_PIN
+
+SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+DEMO_PRIVATE_KEY=0xc5090130562cc12fbaaaedd107d9738ea65a1346d2c80cf34e46a3c8b8a58125
+DEMO_WRITE_ENABLED=true
+DEMO_EXECUTION_MODE=simulate
+DEMO_SIMULATED_BALANCE_ETH=50
+DEMO_REQUIRE_WHITELIST=true
+DEMO_REQUIRE_LOCAL_AUTH=false
+DEMO_APPROVAL_PIN=123456
+DEMO_CHAIN_ID=11155111
+DEMO_MAX_TRANSFER_ETH=0.5
+DEMO_PROPOSAL_TTL_MINUTES=30
+DEMO_LOCAL_AUTH_TTL_MINUTES=5
+DEMO_DATA_DIR=./data
+```
 
 注意：
 
-- 如果 `.env` 里的 `DEMO_PRIVATE_KEY` 仍然是占位符值，程序会报错
-- 你必须做下面二选一：
-  - 要么把 `DEMO_PRIVATE_KEY` 清空
-  - 要么换成你自己的 Sepolia 测试钱包私钥
+- 这份配置和当前项目演示环境一致，复制后就能直接跑通 README 里的流程
+- 当前模板把 `DEMO_WRITE_ENABLED` 设成了 `true`，是为了让演示流程可以直接执行；如果你只想先做只读测试，可以改回 `false`
+- 当前模板没有设置 `DEMO_OPERATOR_PIN`，所以 Operator Console 登录时会回退使用 `DEMO_APPROVAL_PIN=123456`
 
 ## 5. 每个关键变量是什么意思
 
@@ -93,9 +129,9 @@ uv run python -m compileall src scripts
 | 变量名 | 是否建议配置 | 作用 |
 | --- | --- | --- |
 | `DEMO_EXECUTION_MODE` | 必须理解 | 当前请固定为 `simulate` |
-| `DEMO_WRITE_ENABLED` | 必须配置 | 即使是本地模拟转账，也需要设成 `true` 才能执行 |
-| `DEMO_OPERATOR_PIN` | 必须配置 | Operator Console 登录 PIN |
-| `DEMO_APPROVAL_PIN` | 建议配置 | 严格模式下本地授权 PIN |
+| `DEMO_WRITE_ENABLED` | 必须理解 | 即使是本地模拟转账，也需要设成 `true` 才能执行 |
+| `DEMO_OPERATOR_PIN` | 可选 | 如果你想给 Operator Console 单独设置登录 PIN，再额外加这一项 |
+| `DEMO_APPROVAL_PIN` | 当前模板已提供 | 本地授权 PIN，同时也是 Operator Console 登录 PIN 的回退值 |
 | `DEMO_DATA_DIR` | 建议理解 | 本地数据目录，保存提案、余额、白名单等状态 |
 
 ### 与钱包身份相关的变量
@@ -110,8 +146,8 @@ uv run python -m compileall src scripts
 
 | 变量名 | 默认值 | 作用 |
 | --- | --- | --- |
-| `DEMO_MAX_TRANSFER_ETH` | `0.05` | 单笔最大可转金额 |
-| `DEMO_REQUIRE_WHITELIST` | `false` | 是否启用收款白名单 |
+| `DEMO_MAX_TRANSFER_ETH` | `0.5` | 单笔最大可转金额 |
+| `DEMO_REQUIRE_WHITELIST` | `true` | 是否启用收款白名单 |
 | `DEMO_REQUIRE_LOCAL_AUTH` | `false` | 是否要求二次本地 PIN 授权 |
 | `DEMO_PROPOSAL_TTL_MINUTES` | `30` | 提案过期时间 |
 | `DEMO_LOCAL_AUTH_TTL_MINUTES` | `5` | 本地授权窗口有效时间 |
@@ -150,7 +186,7 @@ Local URL: http://localhost:8501
 然后你需要做这些事：
 
 1. 打开浏览器访问终端里的本地地址
-2. 输入 `DEMO_OPERATOR_PIN`（默认123456）
+2. 输入 `DEMO_OPERATOR_PIN`；如果你没单独设置它，就输入 `DEMO_APPROVAL_PIN`（当前模板默认 `123456`）
 3. 进入后台页面
 
 ### Operator Console 每个页面是做什么的
@@ -324,9 +360,9 @@ uv run cobo-wallet-demo cancel-proposal --proposal-id proposal_xxxxxxxx
 
 1. `git clone` 项目并进入目录
 2. 运行 `uv sync`
-3. 直接编辑项目里的 `.env`，或者保持不变
+3. 执行 `cp .env.example .env`，或者手动按 README 里的配置块创建 `.env`
 4. 运行 `uv run cobo-wallet-operator`
-5. 打开浏览器，输入 `DEMO_OPERATOR_PIN`（默认123456）
+5. 打开浏览器，输入 `DEMO_OPERATOR_PIN`；如果没单独设置，就输入 `DEMO_APPROVAL_PIN`（当前模板默认 `123456`）
 6. 在项目根目录执行 Codex 注册命令
 7. 在 Codex 里说：
    - `显示我的钱包总览`
