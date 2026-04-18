@@ -55,17 +55,19 @@ def _build_display_markdown(
 def handle(context: ToolContext) -> dict:
     account = context.wallet_service.get_account_summary()
     address = account["address"]
-    configured = account["configured"]
+    wallet_fully_configured = account["configured"]
+    address_ready = address != "UNCONFIGURED"
     network = account["network"]
     chain_id = account["chain_id"]
     execution_mode = account["execution_mode"]
     asset = "ETH"
     title = "我的收款信息"
 
-    if not configured or address == "UNCONFIGURED":
+    if not address_ready:
         result = {
             "title": title,
             "configured": False,
+            "wallet_fully_configured": wallet_fully_configured,
             "share_ready": False,
             "address": address,
             "network": network,
@@ -86,7 +88,12 @@ def handle(context: ToolContext) -> dict:
         address=address,
     )
     operator_note = None
-    if execution_mode == "simulate":
+    if not wallet_fully_configured:
+        operator_note = (
+            "当前钱包还没有完整配置 RPC 或发送能力。"
+            "这不会影响别人向该地址转账，但会影响本地读取链上余额或真实广播交易。"
+        )
+    elif execution_mode == "simulate":
         operator_note = (
             "当前项目处于 simulate 模式。"
             "这张收款信息可用于展示真实链上地址，但系统不会自动把真实链上入账同步到本地模拟余额。"
@@ -100,6 +107,7 @@ def handle(context: ToolContext) -> dict:
     result = {
         "title": title,
         "configured": True,
+        "wallet_fully_configured": wallet_fully_configured,
         "share_ready": True,
         "address": address,
         "network": network,

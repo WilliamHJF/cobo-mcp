@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from cobo_wallet.amounts import format_eth_display
 from cobo_wallet.tools.context import ToolContext
 from cobo_wallet.tools.proposal_derived import (
     get_balance_after_eth,
@@ -26,10 +27,14 @@ def handle(context: ToolContext, tx_hash: str) -> dict:
             "requested_to": get_requested_to(simulated),
             "recipient_name": simulated.recipient_name,
             "to": simulated.to,
-            "amount_eth": simulated.amount_eth,
-            "estimated_fee_eth": simulated.estimated_fee_eth,
+            "amount_eth": format_eth_display(simulated.amount_eth),
+            "estimated_fee_eth": format_eth_display(simulated.estimated_fee_eth)
+            if simulated.estimated_fee_eth is not None
+            else None,
             "estimated_total_cost_eth": get_estimated_total_cost_eth(simulated),
-            "balance_before_eth": simulated.balance_before_eth,
+            "balance_before_eth": format_eth_display(simulated.balance_before_eth)
+            if simulated.balance_before_eth is not None
+            else None,
             "balance_after_eth": get_balance_after_eth(simulated),
             "executed_at": (
                 simulated.executed_at.isoformat()

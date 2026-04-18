@@ -22,19 +22,17 @@
 - 当前 `.env` 已把本地模拟余额默认设成 `50 ETH`，方便直接测试
 - 模拟余额会统一保存在 [wallet_state.json](/Users/william/cobo/data/wallet_state.json)
 - `.env` 里的 `DEMO_SIMULATED_BALANCE_ETH` 只负责提供初始余额
-- `wallet_get_balance`、`wallet_get_overview`、`wallet_estimate_transfer`、`wallet_prepare_transfer` 现在都会直接返回余额来源说明
+- 面向 Codex 的 `wallet_get_overview`、`wallet_prepare_transfer` 会直接返回余额来源说明
+- 内部 CLI 的 `balance`、`estimate` 命令也保留了同类信息
 
 ## 当前已实现能力
+
+当前对 Codex 暴露的 MCP 能力：
 
 - `wallet_get_overview`
 - `wallet_list_recipients`
 - `wallet_list_whitelist`
 - `wallet_get_receive_card`
-- `wallet_add_recipient`
-- `wallet_update_recipient`
-- `wallet_delete_recipient`
-- `wallet_allow_recipient`
-- `wallet_revoke_recipient`
 - `wallet_prepare_transfer`
 - `wallet_get_proposal`
 - `wallet_cancel_proposal`
@@ -44,21 +42,46 @@
 - `wallet_list_transactions`
 - `wallet_list_proposals`
 
-当前 MCP 暴露的是“高层工具”，内部仍然保留了更细的模块，但默认不再直接暴露给 Codex。
+当前 MCP 暴露的是“只读 + 转账主流程”工具。
+
+人工后台 Operator Console 负责的能力：
+
+- 钱包私钥与 RPC 配置
+- 模拟余额调整
+- 白名单修改
+- 地址簿修改
+- 策略与权限开关修改
+
+内部模块和 CLI 仍然保留更细的能力，但这些管理类写操作默认不再直接暴露给 Codex。
+
+当前人工后台最小 Demo 页面结构：
+
+- `Dashboard`
+  - 看总览、最近提案、最近交易、最近人工资金调整
+- `Wallet`
+  - 改私钥和 RPC
+- `Balance Lab`
+  - 做模拟入金、出金、直接设余额
+- `Whitelist`
+  - 管理白名单地址
+- `Address Book`
+  - 管理联系人、别名、备注
+- `Policy`
+  - 改写入开关、执行模式、白名单开关、本地授权开关、限额和 PIN
 
 ## 为什么要合并
 
-原先的 MCP 工具里，有几类明显可以合并：
+原先拆得更细的流程里，有几类明显可以合并：
 
-- `get_account + get_balance + list_policy`
+- 账户信息 + 余额 + 策略
   - 都属于“启动前看一下当前钱包状态”
   - 现在合并成 `wallet_get_overview`
-- `estimate_transfer + create_transfer_proposal`
+- 预估转账 + 创建提案
   - 实际上创建提案时本来就会做预估
   - 现在合并成 `wallet_prepare_transfer`
-- `request_local_authorization + confirm_transfer`
+- 授权检查 + 最终执行
   - 对 Codex 来说它们都属于“确认后往下执行”
-  - 现在合并成 `wallet_execute_transfer`
+  - 现在由 `wallet_execute_transfer` 对外统一包装
   - 默认模式会直接执行
   - 严格模式会先返回本地 PIN 授权指引
 
@@ -69,11 +92,6 @@
 - `wallet_get_receive_card`
   - 因为“别人怎么给我转账”也是独立场景
   - 它只负责展示当前钱包的收款信息，不涉及任何写操作
-- `wallet_add_recipient / wallet_update_recipient / wallet_delete_recipient`
-  - 因为地址簿维护不是转账主流程，但又是高频的独立管理动作
-- `wallet_list_whitelist / wallet_allow_recipient / wallet_revoke_recipient`
-  - 因为白名单不是“名字映射”，而是独立的权限边界
-  - 地址簿解决“叫什么”，白名单解决“允不允许转”
 - `wallet_get_proposal / wallet_cancel_proposal`
   - 因为提案经常需要单独回看状态、或在执行前主动取消
 - `wallet_confirm_proposal`
@@ -112,11 +130,7 @@
 
 本地地址簿文件在 [address_book.json](/Users/william/cobo/data/address_book.json)，你之后只要往里面继续加联系人就可以。
 
-如果你不想手改 JSON，现在也可以直接通过 MCP 或 CLI 管理地址簿：
-
-- 新增：`wallet_add_recipient`
-- 更新：`wallet_update_recipient`
-- 删除：`wallet_delete_recipient`
+如果你不想手改 JSON，现在建议通过人工后台 Operator Console 或 CLI 管理地址簿。
 
 现在创建提案或预估时，工具返回里会额外包含：
 
@@ -145,28 +159,11 @@
 - 已创建但尚未执行的提案，如果目标地址后来被移出白名单，也会被阻止继续确认或执行
 - 这种阻止不会产生新状态，而是让提案显示 `ready_for_execution=false`
 
-当前提供 3 个白名单工具：
+当前对 Codex 只保留白名单只读查看：
 
 - `wallet_list_whitelist`
-- `wallet_allow_recipient`
-- `wallet_revoke_recipient`
 
-其中 `wallet_allow_recipient` 默认只保存地址：
-
-- 如果你只传 `target`，白名单里只会写入地址
-- 只有你显式传 `name` 时，才会额外保存一个展示名
-
-你也可以直接对 Codex 说：
-
-```text
-把 burn 加入白名单
-```
-
-或者：
-
-```text
-把 burn 从白名单移除
-```
+白名单的新增、删除和备注修改现在统一走人工后台 Operator Console 或 CLI，不再直接交给 Codex。
 
 ## 默认交互流程
 
@@ -279,13 +276,50 @@ DEMO_REQUIRE_LOCAL_AUTH=true
 DEMO_REQUIRE_WHITELIST=true
 ```
 
+如果你要使用人工控制台，再额外建议配置：
+
+```env
+DEMO_OPERATOR_PIN=135790
+```
+
 补充说明：
 
 - `DEMO_SIMULATED_BALANCE_ETH` 不是每次请求都直接读取的实时余额
 - 它只用于初始化本地模拟钱包状态
 - 之后余额会和钱包元信息一起保存在 [wallet_state.json](/Users/william/cobo/data/wallet_state.json)
+- `DEMO_OPERATOR_PIN` 用来登录人工控制台
+- 如果不配置 `DEMO_OPERATOR_PIN`，当前 Demo 会回退使用 `DEMO_APPROVAL_PIN`
 
-## 本地 CLI 演示
+## 启动人工控制台
+
+```bash
+uv run cobo-wallet-operator
+```
+
+人工控制台当前提供 6 个页面：
+
+- `Dashboard`
+- `Wallet`
+- `Balance Lab`
+- `Whitelist`
+- `Address Book`
+- `Policy`
+
+适合通过人工控制台完成的动作：
+
+- 修改私钥或 RPC
+- 调整模拟余额
+- 管理白名单
+- 管理地址簿
+- 修改写入开关、白名单开关和本地授权开关
+
+## 内部 CLI / 调试命令
+
+这些命令主要用于本地调试、回归测试和人工兜底管理。
+
+- Codex 默认不会直接调用它们
+- 地址簿和白名单这类敏感写操作，建议优先走 Operator Console
+- CLI 仍然保留，是为了方便你在本地脚本化处理或排障
 
 查看账户：
 
@@ -490,23 +524,7 @@ codex mcp get cobo-wallet
 - 已执行的转账
 - 已取消的转账提案
 
-如果你先要维护联系人，也可以直接对 Codex 说：
-
-```text
-把 0x000000000000000000000000000000000000dEaD 保存成联系人 burn2，别名为 dead2
-```
-
-如果你开启了白名单模式，也可以直接对 Codex 说：
-
-```text
-把 burn 加入白名单
-```
-
-或者：
-
-```text
-查看当前白名单
-```
+如果你要维护联系人、白名单、私钥或测试余额，请改用人工控制台，而不是让 Codex 直接修改。
 
 ## 当前边界
 

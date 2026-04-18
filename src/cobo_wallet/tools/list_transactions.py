@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from cobo_wallet.amounts import format_eth_display
 from cobo_wallet.policy.engine import PolicyError
 from cobo_wallet.tools.context import ToolContext
 from cobo_wallet.tools.proposal_derived import (
@@ -59,10 +60,14 @@ def _build_transaction_item(proposal) -> dict:
         "recipient_display": recipient_display,
         "short_address": _short_address(proposal.to),
         "to": proposal.to,
-        "amount_eth": proposal.amount_eth,
-        "estimated_fee_eth": proposal.estimated_fee_eth,
+        "amount_eth": format_eth_display(proposal.amount_eth),
+        "estimated_fee_eth": format_eth_display(proposal.estimated_fee_eth)
+        if proposal.estimated_fee_eth is not None
+        else None,
         "estimated_total_cost_eth": get_estimated_total_cost_eth(proposal),
-        "balance_before_eth": proposal.balance_before_eth,
+        "balance_before_eth": format_eth_display(proposal.balance_before_eth)
+        if proposal.balance_before_eth is not None
+        else None,
         "balance_after_eth": get_balance_after_eth(proposal),
         "created_at": proposal.created_at.isoformat(),
         "executed_at": proposal.executed_at.isoformat() if proposal.executed_at else None,
@@ -87,15 +92,15 @@ def handle(context: ToolContext, limit: int = 20) -> dict:
     simulated_count = 0
     executed_count = 0
     cancelled_count = 0
-    for item in transactions:
-        amount = Decimal(item["amount_eth"])
+    for proposal in selected:
+        amount = Decimal(proposal.amount_eth)
         total_record_amount += amount
-        if item["simulated"]:
+        if get_execution_mode(proposal) == "simulate":
             simulated_count += 1
-        if item["record_type"] == "executed":
+        if proposal.status == "executed":
             executed_count += 1
             executed_amount += amount
-        if item["record_type"] == "cancelled":
+        if proposal.status == "rejected":
             cancelled_count += 1
             cancelled_amount += amount
 
@@ -105,9 +110,9 @@ def handle(context: ToolContext, limit: int = 20) -> dict:
         "total_history_count": len(proposals),
         "transactions": transactions,
         "summary": {
-            "displayed_total_record_amount_eth": format(total_record_amount, "f"),
-            "displayed_executed_amount_eth": format(executed_amount, "f"),
-            "displayed_cancelled_amount_eth": format(cancelled_amount, "f"),
+            "displayed_total_record_amount_eth": format_eth_display(total_record_amount),
+            "displayed_executed_amount_eth": format_eth_display(executed_amount),
+            "displayed_cancelled_amount_eth": format_eth_display(cancelled_amount),
             "simulated_count": simulated_count,
             "executed_count": executed_count,
             "cancelled_count": cancelled_count,

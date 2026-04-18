@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from cobo_wallet.amounts import format_eth_display
 from cobo_wallet.policy.engine import PolicyError
 from cobo_wallet.tools.context import ToolContext
 
@@ -26,7 +27,7 @@ def handle(context: ToolContext, proposal_id: str) -> dict:
             "requested_to": proposal.requested_to,
             "recipient_name": proposal.recipient_name,
             "to": proposal.to,
-            "amount_eth": proposal.amount_eth,
+            "amount_eth": format_eth_display(proposal.amount_eth),
             "local_authorization_required": False,
             "local_authorization_ttl_minutes": None,
             "authorization_expires_at": None,
@@ -89,7 +90,7 @@ def handle(context: ToolContext, proposal_id: str) -> dict:
         "requested_to": proposal.requested_to,
         "recipient_name": proposal.recipient_name,
         "to": proposal.to,
-        "amount_eth": proposal.amount_eth,
+        "amount_eth": format_eth_display(proposal.amount_eth),
         "local_authorization_required": True,
         "local_authorization_ttl_minutes": context.settings.demo_local_authorization_ttl_minutes,
         "authorization_expires_at": proposal.authorization_expires_at,

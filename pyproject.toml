@@ -12,6 +12,7 @@ dependencies = [
   "mcp>=1.12.0",
   "pydantic>=2.11.0",
   "python-dotenv>=1.0.1",
+  "streamlit>=1.44.0",
   "web3>=7.0.0",
 ]
 
@@ -20,6 +21,7 @@ cobo-wallet-mcp = "cobo_wallet.server:main"
 cobo-wallet-approve = "scripts.approve_proposal:main"
 cobo-wallet-authorize = "scripts.approve_proposal:main"
 cobo-wallet-demo = "scripts.demo_cli:main"
+cobo-wallet-operator = "scripts.operator_console:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cobo_wallet", "scripts"]

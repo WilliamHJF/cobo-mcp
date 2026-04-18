@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-
-def _format_decimal(value: Decimal) -> str:
-    return format(value, "f")
+from cobo_wallet.amounts import format_eth_display, format_optional_eth_display
 
 
 def get_requested_to(proposal) -> str:
@@ -22,14 +20,19 @@ def get_execution_mode(proposal) -> str | None:
 def get_estimated_total_cost_eth(proposal) -> str | None:
     if proposal.estimated_fee_eth is None:
         return None
-    return _format_decimal(Decimal(proposal.amount_eth) + Decimal(proposal.estimated_fee_eth))
+    return format_eth_display(
+        Decimal(proposal.amount_eth) + Decimal(proposal.estimated_fee_eth)
+    )
 
 
 def get_balance_after_eth(proposal) -> str | None:
-    total_cost = get_estimated_total_cost_eth(proposal)
-    if proposal.balance_before_eth is None or total_cost is None:
+    if proposal.balance_before_eth is None or proposal.estimated_fee_eth is None:
         return None
-    return _format_decimal(Decimal(proposal.balance_before_eth) - Decimal(total_cost))
+    return format_eth_display(
+        Decimal(proposal.balance_before_eth)
+        - Decimal(proposal.amount_eth)
+        - Decimal(proposal.estimated_fee_eth)
+    )
 
 
 def get_explorer_url(proposal) -> str | None:
@@ -62,6 +65,9 @@ def get_happened_at(proposal):
 
 def dump_proposal(proposal) -> dict:
     data = proposal.model_dump(mode="json", exclude_none=True)
+    data["amount_eth"] = format_eth_display(proposal.amount_eth)
+    data["estimated_fee_eth"] = format_optional_eth_display(proposal.estimated_fee_eth)
+    data["balance_before_eth"] = format_optional_eth_display(proposal.balance_before_eth)
     execution_mode = get_execution_mode(proposal)
     if execution_mode is not None:
         data["execution_mode"] = execution_mode

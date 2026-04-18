@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from cobo_wallet.amounts import format_eth_display
 from cobo_wallet.tools.context import ToolContext
 from cobo_wallet.tools.proposal_derived import (
     dump_proposal,
@@ -91,21 +92,23 @@ def _infer_matched_by(proposal) -> str:
 
 
 def _build_confirmation_preview(context: ToolContext, proposal, recipient_preview: dict) -> dict | None:
+    amount_eth = format_eth_display(proposal.amount_eth)
     if proposal.status == "executed" and proposal.estimated_fee_eth:
         total_cost = get_estimated_total_cost_eth(proposal)
+        estimated_fee_eth = format_eth_display(proposal.estimated_fee_eth)
         return {
             "recipient_name": recipient_preview["recipient_name"],
             "requested_to": recipient_preview["requested_to"],
             "resolved_to": recipient_preview["resolved_to"],
             "display_text": recipient_preview["display_text"],
             "short_address": recipient_preview["short_address"],
-            "amount_eth": proposal.amount_eth,
-            "estimated_fee_eth": proposal.estimated_fee_eth,
+            "amount_eth": amount_eth,
+            "estimated_fee_eth": estimated_fee_eth,
             "estimated_total_cost_eth": total_cost,
             "review_items": [
                 f"收款人: {recipient_preview['display_text']}",
                 f"实际地址: {recipient_preview['resolved_to']}",
-                f"转账金额: {proposal.amount_eth} ETH",
+                f"转账金额: {amount_eth} ETH",
                 f"实际成本: {total_cost} ETH",
                 "状态: 已执行完成",
             ],
@@ -114,8 +117,8 @@ def _build_confirmation_preview(context: ToolContext, proposal, recipient_previe
                 "fields": [
                     {"label": "收款人", "value": recipient_preview["display_text"]},
                     {"label": "实际地址", "value": recipient_preview["resolved_to"]},
-                    {"label": "转账金额", "value": f"{proposal.amount_eth} ETH"},
-                    {"label": "手续费", "value": f"{proposal.estimated_fee_eth} ETH"},
+                    {"label": "转账金额", "value": f"{amount_eth} ETH"},
+                    {"label": "手续费", "value": f"{estimated_fee_eth} ETH"},
                     {"label": "总成本", "value": f"{total_cost} ETH"},
                     {"label": "状态", "value": "已执行完成"},
                 ],
@@ -126,8 +129,8 @@ def _build_confirmation_preview(context: ToolContext, proposal, recipient_previe
                     "",
                     f"- 收款人：`{recipient_preview['display_text']}`",
                     f"- 实际地址：`{recipient_preview['resolved_to']}`",
-                    f"- 转账金额：`{proposal.amount_eth} ETH`",
-                    f"- 手续费：`{proposal.estimated_fee_eth} ETH`",
+                    f"- 转账金额：`{amount_eth} ETH`",
+                    f"- 手续费：`{estimated_fee_eth} ETH`",
                     f"- 总成本：`{total_cost} ETH`",
                 ]
             ),
@@ -140,7 +143,7 @@ def _build_confirmation_preview(context: ToolContext, proposal, recipient_previe
         )
         return build_confirmation_preview(
             recipient_preview=recipient_preview,
-            amount_eth=proposal.amount_eth,
+            amount_eth=amount_eth,
             estimated_fee_eth=quote["estimated_fee_eth"],
             estimated_total_cost_eth=quote["estimated_total_cost_eth"],
         )

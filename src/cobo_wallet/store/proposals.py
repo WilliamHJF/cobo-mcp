@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from web3 import Web3
 
+from cobo_wallet.amounts import format_eth_storage, format_optional_eth_storage
 from cobo_wallet.config.env import Settings
 from cobo_wallet.models import Proposal
 from cobo_wallet.store.common import read_json, write_json
@@ -159,7 +160,7 @@ class ProposalStore:
                     Decimal(str(legacy_total_cost))
                     - Decimal(str(normalized_item["amount_eth"]))
                 )
-                normalized_item["estimated_fee_eth"] = format(fee, "f")
+                normalized_item["estimated_fee_eth"] = format_eth_storage(fee)
                 changed = True
             if (
                 normalized_item.get("status") == "executed"
@@ -172,7 +173,7 @@ class ProposalStore:
                     - Decimal(str(legacy_balance_after))
                     - Decimal(str(normalized_item["amount_eth"]))
                 )
-                normalized_item["estimated_fee_eth"] = format(fee, "f")
+                normalized_item["estimated_fee_eth"] = format_eth_storage(fee)
                 changed = True
             if (
                 normalized_item.get("status") == "executed"
@@ -185,7 +186,9 @@ class ProposalStore:
                     + Decimal(str(normalized_item["amount_eth"]))
                     + Decimal(str(normalized_item["estimated_fee_eth"]))
                 )
-                normalized_item["balance_before_eth"] = format(balance_before, "f")
+                normalized_item["balance_before_eth"] = format_eth_storage(balance_before)
+                changed = True
+            if self._normalize_numeric_fields(normalized_item):
                 changed = True
             for field in removed_fields:
                 if field in normalized_item:
@@ -198,9 +201,14 @@ class ProposalStore:
         return proposals
 
     def save_all(self, proposals: list[Proposal]) -> None:
+        items = []
+        for item in proposals:
+            dumped = item.model_dump(mode="json", exclude_none=True)
+            self._normalize_numeric_fields(dumped)
+            items.append(dumped)
         write_json(
             self.path,
-            [item.model_dump(mode="json", exclude_none=True) for item in proposals],
+            items,
         )
 
     def create(
@@ -212,7 +220,8 @@ class ProposalStore:
         requested_to: str | None = None,
         recipient_name: str | None = None,
     ) -> Proposal:
-        amount_wei = str(Web3.to_wei(Decimal(amount_eth), "ether"))
+        normalized_amount_eth = format_eth_storage(amount_eth)
+        amount_wei = str(Web3.to_wei(Decimal(normalized_amount_eth), "ether"))
         expires_at = datetime.now(UTC) + timedelta(
             minutes=self.settings.demo_proposal_ttl_minutes
         )
@@ -222,7 +231,7 @@ class ProposalStore:
             requested_to=requested_to,
             recipient_name=recipient_name,
             to=to,
-            amount_eth=amount_eth,
+            amount_eth=normalized_amount_eth,
             amount_wei=amount_wei,
             chain_id=chain_id,
             intent_hash=hashlib.sha256(intent_raw.encode("utf-8")).hexdigest(),
@@ -395,12 +404,16 @@ class ProposalStore:
                     "canceled_at": canceled_at
                     if canceled_at is not None
                     else proposal.canceled_at,
-                    "estimated_fee_eth": estimated_fee_eth
-                    if estimated_fee_eth is not None
-                    else proposal.estimated_fee_eth,
-                    "balance_before_eth": balance_before_eth
-                    if balance_before_eth is not None
-                    else proposal.balance_before_eth,
+                    "estimated_fee_eth": format_optional_eth_storage(
+                        estimated_fee_eth
+                        if estimated_fee_eth is not None
+                        else proposal.estimated_fee_eth
+                    ),
+                    "balance_before_eth": format_optional_eth_storage(
+                        balance_before_eth
+                        if balance_before_eth is not None
+                        else proposal.balance_before_eth
+                    ),
                 }
                 updated = proposal.model_copy(update=update_data)
                 proposals[idx] = updated
@@ -409,3 +422,15 @@ class ProposalStore:
             raise KeyError(f"提案不存在: {proposal_id}")
         self.save_all(proposals)
         return updated
+
+    def _normalize_numeric_fields(self, item: dict) -> bool:
+        changed = False
+        for field in ("amount_eth", "estimated_fee_eth", "balance_before_eth"):
+            value = item.get(field)
+            if value is None:
+                continue
+            normalized = format_eth_storage(value)
+            if normalized != value:
+                item[field] = normalized
+                changed = True
+        return changed

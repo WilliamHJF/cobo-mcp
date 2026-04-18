@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from cobo_wallet.amounts import format_eth_display
 from cobo_wallet.policy.engine import PolicyError
 from cobo_wallet.tools.context import ToolContext
 
@@ -24,7 +25,7 @@ def handle(context: ToolContext, proposal_id: str) -> dict:
             "requested_to": proposal.requested_to,
             "recipient_name": proposal.recipient_name,
             "to": proposal.to,
-            "amount_eth": proposal.amount_eth,
+            "amount_eth": format_eth_display(proposal.amount_eth),
             "user_confirmed": True,
             "ready_for_execution": False,
             "next_required_action": None,
@@ -57,7 +58,7 @@ def handle(context: ToolContext, proposal_id: str) -> dict:
                 "requested_to": proposal.requested_to,
                 "recipient_name": proposal.recipient_name,
                 "to": proposal.to,
-                "amount_eth": proposal.amount_eth,
+                "amount_eth": format_eth_display(proposal.amount_eth),
                 "user_confirmed": True,
                 "ready_for_execution": False,
                 "next_required_action": "local_authorization",
@@ -80,7 +81,7 @@ def handle(context: ToolContext, proposal_id: str) -> dict:
                 "requested_to": proposal.requested_to,
                 "recipient_name": proposal.recipient_name,
                 "to": proposal.to,
-                "amount_eth": proposal.amount_eth,
+                "amount_eth": format_eth_display(proposal.amount_eth),
                 "user_confirmed": True,
                 "ready_for_execution": True,
                 "next_required_action": "execute_transfer",
@@ -111,7 +112,7 @@ def handle(context: ToolContext, proposal_id: str) -> dict:
         "requested_to": proposal.requested_to,
         "recipient_name": proposal.recipient_name,
         "to": proposal.to,
-        "amount_eth": proposal.amount_eth,
+        "amount_eth": format_eth_display(proposal.amount_eth),
         "user_confirmed": True,
         "ready_for_execution": True,
         "next_required_action": "execute_transfer",

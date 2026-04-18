@@ -9,7 +9,8 @@ from pydantic import BaseModel, Field
 
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
-load_dotenv(ROOT_DIR / ".env")
+ENV_PATH = ROOT_DIR / ".env"
+load_dotenv(ENV_PATH)
 
 
 def _as_bool(value: str | None, *, default: bool = False) -> bool:
@@ -22,6 +23,7 @@ class Settings(BaseModel):
     app_name: str = "COBO Wallet MCP"
     sepolia_rpc_url: str = Field(default="")
     demo_private_key: str = Field(default="")
+    demo_operator_pin: str = Field(default="")
     demo_write_enabled: bool = Field(default=False)
     demo_execution_mode: str = Field(default="simulate")
     demo_simulated_balance_eth: str = Field(default="50")
@@ -44,6 +46,10 @@ def get_settings() -> Settings:
     return Settings(
         sepolia_rpc_url=os.getenv("SEPOLIA_RPC_URL", ""),
         demo_private_key=os.getenv("DEMO_PRIVATE_KEY", ""),
+        demo_operator_pin=os.getenv(
+            "DEMO_OPERATOR_PIN",
+            os.getenv("DEMO_APPROVAL_PIN", ""),
+        ),
         demo_write_enabled=_as_bool(os.getenv("DEMO_WRITE_ENABLED"), default=False),
         demo_execution_mode=os.getenv("DEMO_EXECUTION_MODE", "simulate").strip().lower(),
         demo_simulated_balance_eth=os.getenv("DEMO_SIMULATED_BALANCE_ETH", "50"),
@@ -62,3 +68,9 @@ def get_settings() -> Settings:
         ),
         demo_data_dir=Path(os.getenv("DEMO_DATA_DIR", str(ROOT_DIR / "data"))),
     )
+
+
+def reload_env_file() -> Settings:
+    load_dotenv(ENV_PATH, override=True)
+    get_settings.cache_clear()
+    return get_settings()

@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 import re
 
+from cobo_wallet.amounts import format_eth_display, format_eth_storage
 from cobo_wallet.config.env import Settings
 from cobo_wallet.models import Proposal
 
@@ -21,7 +22,7 @@ class PolicyEngine:
         if not normalized:
             raise PolicyError("转账金额不能为空")
         amount = self.validate_amount(normalized)
-        return format(amount, "f")
+        return format_eth_storage(amount)
 
     def validate_chain_id(self, chain_id: int) -> None:
         if chain_id != self.settings.demo_chain_id:
@@ -38,13 +39,17 @@ class PolicyEngine:
 
         if amount > Decimal(self.settings.demo_max_transfer_eth):
             raise PolicyError(
-                f"单笔转账金额不能超过 {self.settings.demo_max_transfer_eth} ETH"
+                f"单笔转账金额不能超过 {format_eth_display(self.settings.demo_max_transfer_eth)} ETH"
             )
         return amount
 
     def validate_write_enabled(self) -> None:
         if not self.settings.demo_write_enabled:
-            raise PolicyError("当前项目处于只读模式，未开启写入权限")
+            raise PolicyError(
+                "当前项目处于只读模式，未开启写入权限。"
+                "请先在本地 Operator Console 的 Policy 页面开启“允许写入”，"
+                "然后再发起或执行转账。"
+            )
 
     def is_recipient_whitelisted(self, *, address: str, whitelist_store) -> bool:
         if not self.settings.demo_require_whitelist:
@@ -69,7 +74,7 @@ class PolicyEngine:
         raise PolicyError(
             "收款地址当前不在白名单中，不能发起或执行这笔转账。"
             f"目标: {target_display} ({address})。"
-            "请先调用 wallet_allow_recipient 将该地址加入白名单。"
+            "请先通过本地 Operator Console 或内部 CLI 将该地址加入白名单。"
         )
 
     def validate_proposal_executable(self, proposal: Proposal) -> None:
