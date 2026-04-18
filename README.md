@@ -1,4 +1,6 @@
-# COBO Wallet MCP
+# Cryptocurrency Wallet MCP
+
+Link：https://github.com/WilliamHJF/cobo-mcp
 
 一个用 Python 实现的本地 MCP 钱包 Demo。
 
