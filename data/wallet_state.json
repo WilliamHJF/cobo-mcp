@@ -1,0 +1,9 @@
+{
+  "address": "0xC18f9e83970032AEC511123F311A10b0A2c68256",
+  "network": "Ethereum Sepolia",
+  "chain_id": 11155111,
+  "execution_mode": "simulate",
+  "configured": true,
+  "write_enabled": true,
+  "simulated_balance_eth": "58.099999915995296"
+}

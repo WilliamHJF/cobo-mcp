@@ -1,0 +1,39 @@
+[
+  {
+    "name": "burn",
+    "address": "0x000000000000000000000000000000000000dEaD",
+    "aliases": [
+      "dead",
+      "销毁地址",
+      "黑洞地址"
+    ],
+    "note": "测试常用的销毁地址"
+  },
+  {
+    "name": "小明",
+    "address": "0x1234567890abcdef1234567890abcdef12345678",
+    "aliases": [
+      "xm",
+      "xiaoming"
+    ],
+    "note": "测试收款人"
+  },
+  {
+    "name": "小红",
+    "address": "0x1234567890AbcdEF1234567890aBcdef87654321",
+    "aliases": [
+      "xh",
+      "hong"
+    ],
+    "note": null
+  },
+  {
+    "name": "Zoey",
+    "address": "0x1234567890aBcdef2222222222AbcDEf87654321",
+    "aliases": [
+      "Zoe",
+      "小左"
+    ],
+    "note": "测试收款人"
+  }
+]

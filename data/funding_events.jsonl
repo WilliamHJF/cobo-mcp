@@ -1,0 +1,2 @@
+{"timestamp": "2026-04-18T06:16:29.987859+00:00", "event_type": "set_balance", "amount_eth": null, "balance_before_eth": "49.969999948500776", "balance_after_eth": "49.969999948500776", "note": "人工调整测试余额"}
+{"timestamp": "2026-04-18T06:16:34.774013+00:00", "event_type": "set_balance", "amount_eth": null, "balance_before_eth": "49.969999948500776", "balance_after_eth": "60", "note": "人工调整测试余额"}
