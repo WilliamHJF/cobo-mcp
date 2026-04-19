@@ -280,6 +280,21 @@ codex
 4. `帮我向 小明 转 0.01 ETH`（选择地址进行转账，白名单有包括小明、小红的地址）
 5. `查看最近10条转账记录`
 
+### 效果截图
+#### 钱包总览
+<img width="600" height="400" alt="image" src="https://github.com/user-attachments/assets/8864c746-4ad0-4e0b-8114-5bd105bbc8a3" />
+
+#### 白名单展示
+<img width="600" height="200" alt="image" src="https://github.com/user-attachments/assets/96daf7ed-cf7d-43a1-9248-9fee0bbb4bb7" />
+
+#### 转账发起
+<img width="600" height="300" alt="image" src="https://github.com/user-attachments/assets/c754fab8-343b-4f76-88bf-1cfc27fb25a6" />
+<img width="600" height="300" alt="image" src="https://github.com/user-attachments/assets/85273353-66e1-4c57-b932-0b26945a9802" />
+
+#### 查看转账记录
+<img width="600" height="300" alt="image" src="https://github.com/user-attachments/assets/e54c4653-6426-47f5-aade-ce7532eda930" />
+
+
 ## 9. Agent 能做什么，不能做什么
 
 ### Agent 可以直接做
